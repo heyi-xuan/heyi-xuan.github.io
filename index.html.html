@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>第4章 微电网控制技术仿真界面｜何宣沂 24新能源1班</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", sans‑serif;
+        }
+        body {
+            background-color: #f0f4f8;
+            padding:16px;
+        }
+        .header-info{
+            background:#1f2937;
+            color:#fff;
+            padding:14px 20px;
+            border-radius:8px;
+            margin-bottom:16px;
+        }
+        .header-info h1{
+            font-size:20px;
+            margin-bottom:6px;
+        }
+        .stu-info{
+            font-size:15px;
+            color:#cbd5e1;
+        }
+        .container{
+            display:grid;
+            grid-template-columns: 300px 1fr;
+            gap:16px;
+        }
+        .panel-left{
+            background:#ffffff;
+            border-radius:8px;
+            padding:16px;
+            box-shadow: 0 2px 8px #00000018;
+        }
+        .panel-left h3{
+            margin-bottom:12px;
+            color:#1e293b;
+            border-bottom:1px solid #e2e8f0;
+            padding-bottom:8px;
+        }
+        .control-item{
+            margin:10px 0;
+        }
+        button{
+            width:100%;
+            padding:10px;
+            margin:4px 0;
+            border:none;
+            border-radius:6px;
+            background:#2563eb;
+            color:#fff;
+            cursor:pointer;
+            font-size:14px;
+        }
+        button:hover{
+            background:#1d4ed8;
+        }
+        button.warn{
+            background:#d97706;
+        }
+        button.danger{
+            background:#dc2626;
+        }
+        .panel-right{
+            background:#ffffff;
+            border-radius:8px;
+            padding:20px;
+            box-shadow:0 2px 8px #00000018;
+        }
+        .block-diagram{
+            border:1px solid #cbd5e1;
+            min-height:420px;
+            padding:12px;
+            background:#f8fafc;
+            border-radius:6px;
+        }
+        .log-area{
+            margin-top:14px;
+            background:#111827;
+            color:#4ade80;
+            padding:12px;
+            border-radius:6px;
+            min-height:120px;
+            font-family:Consolas;
+            font-size:13px;
+            white-space:pre-wrap;
+        }
+        .box-node{
+            display:inline-block;
+            border:2px solid #2563eb;
+            padding:8px 12px;
+            margin:6px;
+            border-radius:4px;
+            background:#dbeafe;
+        }
+        .box-node.master{
+            border-color:#dc2626;
+            background:#fee2e2;
+        }
+        .box-node.slave{
+            border-color:#059669;
+            background:#d1fae5;
+        }
+        .box-node.grid{
+            border-color:#7c3aed;
+            background:#ede9fe;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-info">
+        <h1>第4章 微电网控制技术｜程序实现仿真界面</h1>
+        <div class="stu-info">姓名：何宣沂 &nbsp;&nbsp;班级：24新能源1班 &nbsp;&nbsp;学号：202410132028</div>
+    </div>
+
+    <div class="container">
+        <div class="panel-left">
+            <h3>控制模式选择</h3>
+            <div class="control-item">
+                <button onclick="showMasterSlave()">1.主从控制模式</button>
+                <button onclick="showPeerToPeer()">2.对等控制模式</button>
+            </div>
+            <h3>运行状态控制</h3>
+            <div class="control-item">
+                <button onclick="runGridConnect()">并网运行控制策略</button>
+                <button onclick="runIsland()">离网（孤岛）运行控制策略</button>
+            </div>
+            <h3>状态切换控制</h3>
+            <div class="control-item">
+                <button class="warn" onclick="grid2Island()">并网→离网切换</button>
+                <button class="warn" onclick="island2Grid()">离网→并网切换</button>
+                <button class="danger" onclick="clearLog()">清空运行日志</button>
+            </div>
+        </div>
+
+        <div class="panel-right">
+            <div class="block-diagram" id="diagramBox">
+                <div style="color:#475569">请点击左侧按钮选择微电网控制模式，框图将在此渲染显示。</div>
+            </div>
+            <div class="log-area" id="logBox">>>>系统就绪，等待下发控制指令...
+</div>
+        </div>
+    </div>
+
+<script>
+const logDom = document.getElementById("logBox");
+const diagramDom = document.getElementById("diagramBox");
+
+function addLog(text){
+    const time = new Date().toLocaleTimeString();
+    logDom.innerText += `[${time}] ${text}\n`;
+    logDom.scrollTop = logDom.scrollHeight;
+}
+
+function clearLog(){
+    logDom.innerText = ">>>日志已清空，等待下发控制指令...\n";
+}
+
+//1 主从控制模式框图渲染
+function showMasterSlave(){
+    diagramDom.innerHTML = `
+    <h4>4.1 微电网主从控制模式框图示意</h4>
+    <div style="margin:10px 0;">
+        <span class="box-node grid">大电网</span> ⟷ PCC公共连接点 ⟷
+        <span class="box-node master">主控DG（储能/微燃机）<br>并网：PQ控制<br>孤岛：U/f控制</span>
+        <br><br>
+        <span class="box-node slave">从属DG1(PQ控制)</span>
+        <span class="box-node slave">从属DG2(PQ控制)</span>
+        <span class="box-node slave">本地负荷</span>
+    </div>
+    <div style="margin-top:12px;font-size:14px;color:#334155;">
+    逻辑说明：<br>
+    • 并网运行：全部分布式电源采用PQ控制；<br>
+    • 孤岛离网：主控DG切换U/f控制，提供电压频率参考；从属DG维持PQ；<br>
+    • 风险点：主控故障，整个微电网瘫痪；需要孤岛检测。
+    </div>
+    `;
+    addLog("【加载主从控制模式】主控单元负责孤岛下电压频率支撑，从属电源执行PQ功率指令。");
+}
+
+//2 对等控制模式框图渲染
+function showPeerToPeer(){
+    diagramDom.innerHTML = `
+    <h4>4.2 微电网对等控制模式框图示意（Droop下垂控制）</h4>
+    <div style="margin:10px 0;">
+        <span class="box-node grid">大电网</span> ⟷ PCC公共连接点 ⟷【交流母线】
+        <br><br>
+        <span class="box-node">DG1 Droop下垂控制</span>
+        <span class="box-node">DG2 Droop下垂控制</span>
+        <span class="box-node">储能单元 Droop下垂控制</span>
+        <span class="box-node">各类本地负荷</span>
+    </div>
+    <div style="margin-top:12px;font-size:14px;color:#334155;">
+    逻辑说明：<br>
+    • 各分布式电源地位对等，无主从关系；<br>
+    • 依靠本地电压频率信息，不需要通信，实现即插即用；<br>
+    • 属于有差调节，孤岛下电压、频率会存在偏移。
+    </div>
+    `;
+    addLog("【加载对等控制模式】全部DG采用Droop下垂控制，依靠本地测量实现功率自动分配。");
+}
+
+//并网运行控制策略
+function runGridConnect(){
+    diagramDom.innerHTML = `
+    <h4>4.3 微电网并网运行控制策略</h4>
+    <div style="margin:10px 0;">
+        <span class="box-node">微电网能量管理MGCC</span>
+        <br>↓下发指令<br>
+        <span class="box-node">①分布式发电/储能计划控制</span>
+        <span class="box-node">②风光储联合功率控制</span>
+        <br>
+        <span class="box-node">③联络线PCC功率控制</span>
+        <span class="box-node">④无功‑电压控制</span>
+        <br>输出→PCC公共连接点→<span class="box-node grid">大配电网</span>
+    </div>
+    <div style="margin-top:12px;font-size:14px;color:#334155;">
+    并网目标：<br>
+    1）控制PCC联络线交换功率，实现削峰填谷；<br>
+    2）风光储联合平抑新能源波动；<br>
+    3）无功电压协调，保障并网点电能质量。
+    </div>
+    `;
+    addLog("【进入并网运行控制】执行联络线功率控制、风光储联合功率、无功电压控制策略。");
+}
+
+//离网孤岛运行
+function runIsland(){
+    diagramDom.innerHTML = `
+    <h4>4.4 微电网离网（孤岛）运行控制策略</h4>
+    <div style="margin:10px 0;">
+        【PCC开关断开，脱离大电网】
+        <br><br>
+        <span class="box-node master">主电源单元(U/f控制)</span>
+        <br>↓<br>
+        <span class="box-node">有功功率平衡控制</span>
+        <span class="box-node">无功‑电压控制</span>
+        <br>
+        <span class="box-node">负荷分级管理：重要负荷优先供电，切除非关键负荷</span>
+    </div>
+    <div style="margin-top:12px;font-size:14px;color:#334155;">
+    孤岛运行要点：<br>
+    • 主电源建立系统电压、频率；<br>
+    • 实时做有功、无功功率平衡；<br>
+    • 功率不足时执行负荷分级，切除次要负荷保障重要负荷。
+    </div>
+    `;
+    addLog("【进入离网孤岛运行】PCC断开，主电源建立电压频率，执行负荷分级策略。");
+}
+
+//并网转离网
+function grid2Island(){
+    diagramDom.innerHTML = `
+    <h4>4.5.4 并网运行 → 离网孤岛切换控制</h4>
+    <div style="margin:10px 0;">
+    1.检测大电网故障/切换指令<br>
+    2.孤岛状态判定<br>
+    3.下发指令调整DG出力，预做功率平衡<br>
+    4.断开PCC静态开关<br>
+    5.主控单元切换U/f控制模式，建立孤岛电压频率<br>
+    6.执行负荷分级，切除次要负荷
+    </div>
+    `;
+    addLog("【执行切换】并网→离网孤岛，断开PCC，主控切换U/f模式，完成孤岛切换。");
+}
+
+//离网转并网
+function island2Grid(){
+    diagramDom.innerHTML = `
+    <h4>4.5.5 离网孤岛 → 并网运行切换控制</h4>
+    <div style="margin:10px 0;">
+    1.检测大电网电压频率恢复正常<br>
+    2.微电网输出与大电网同步（电压、相位、频率同步）<br>
+    3.同步完成，闭合PCC静态开关<br>
+    4.主控DG切回PQ功率控制模式<br>
+    5.恢复被切除的次要负荷，进入并网稳态运行
+    </div>
+    `;
+    addLog("【执行切换】离网孤岛→并网，完成同步，闭合PCC，切换全部DG至PQ控制。");
+}
+
+</script>
+</body>
+</html>
